@@ -18,7 +18,7 @@ package controllers
 
 import (
 	"context"
-	"st"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -51,15 +51,14 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	logger := log.FromContext(ctx)
 
 	logger.Info("Starting reconcile loop")
+
 	secret := &secretsv1alpha1.Secret{}
-	logger.Info("CRD with name " + secret.Spec.SecretResource.Name + " and namespace " + secret.Spec.SecretResource.Namespace)
-	logger.Info(secret.Spec.SecretResource.Name)
-	logger.Info(secret.Spec.SecretResource.Namespace)
+	err := r.Get(ctx, req.NamespacedName, secret)
+	if err != nil {
+		logger.Error(err, "Failed to fetch CRDs")
+	}
 
-	logger.Info("Verify if the deployment already exists, if not create a new one")
-
-	// err := r.Get(ctx, req.NamespacedName, secret)
-	// logger.Info("CRD with name " + req.Name + " and namespace " + req.Namespace)
+	logger.Info("Secret will have name " + secret.Spec.Secret.Name + " and namespace " + secret.Spec.Secret.Namespace + " and type " + secret.Spec.Generator.Type + " with length " + fmt.Sprintf("%v", secret.Spec.Generator.Length))
 
 	return ctrl.Result{}, nil
 }

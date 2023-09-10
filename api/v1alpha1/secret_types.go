@@ -20,9 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // SecretSpec defines the desired state of Secret
 // +kubebuilder:validation:Required
 type SecretSpec struct {
@@ -30,8 +27,8 @@ type SecretSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Secret. Edit secret_types.go to remove/update
-	SecretResource  SecretResource  `json:"secretResource"`
-	SecretGenerator SecretGenerator `json:"secretGenerator"`
+	Secret    SecretResource  `json:"secret"`
+	Generator SecretGenerator `json:"generator"`
 }
 
 // +kubebuilder:validation:Required
@@ -40,9 +37,10 @@ type SecretResource struct {
 	Namespace string `json:"namespace"`
 }
 
+// +kubebuilder:validation:Required
 type SecretGenerator struct {
-	// +kubebuilder:validation:Required
-	GeneratorCommand string `json:"command"`
+	Type   string `json:"type"`
+	Length int    `json:"length"`
 }
 
 // SecretStatus defines the observed state of Secret
