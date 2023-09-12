@@ -21,12 +21,14 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	// "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+
 	// v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -56,7 +58,7 @@ type SecretReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
+//TODO: user: Modify the Reconcile function to compare the state specified by
 // the Secret object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
@@ -83,20 +85,23 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err != nil && errors.IsNotFound(err) {
 		// Create a new secret
 		newSecret := r.secretGeneration(secret, ctx)
-		logger.Info("Creating a new Secret", "Secret Name: ", secret.Spec.Secret.Name, "Secret Namespace: ", secret.Spec.Secret.Namespace)
+		logger.Info("Creating a new Secret" + "Secret Name: " + secret.Spec.Secret.Name + "Secret Namespace: " + secret.Spec.Secret.Namespace)
 		err = r.Create(ctx, newSecret)
 		if err != nil {
-			logger.Error(err, "Failed to create new Secret with Secret Name: ", secret.Spec.Secret.Name, "Secret Namespace: ", secret.Spec.Secret.Namespace)
+			logger.Info("Deleting Secret" + "Secret Name: " + secret.Spec.Secret.Name + "Secret Namespace: " + secret.Spec.Secret.Namespace)
+			err = r.Delete(ctx, newSecret)
+			logger.Error(err, "Failed deleting secret")
 			return ctrl.Result{}, err
 		}
 		// Secret created successfully - return and requeue
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{Requeue: true}, err
+
 	} else if err != nil {
 		logger.Error(err, "Failed to get Secrets")
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx context.Context) *corev1.Secret {
@@ -107,7 +112,7 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 	var randomString []byte
 
 	switch secret.Spec.Generator.Type {
-	case "hash":
+	case "authelia-hash":
 		randomToBeHashedString := randomStringGenerator(secret.Spec.Generator.Length)
 
 		logger.Info("Hashed String is: " + string(randomToBeHashedString))
@@ -144,9 +149,15 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 		secretData[secret.Spec.Generator.Key] = randomToBeHashedString
 
 		return &corev1.Secret{
-			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-			ObjectMeta: metav1.ObjectMeta{Name: secret.Spec.Secret.Name, Namespace: secret.Spec.Secret.Namespace},
-			Data:       secretData,
+			TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secret.Spec.Secret.Name,
+				Namespace: secret.Spec.Secret.Namespace,
+				Labels: map[string]string{
+					"esg.jkulzer.dev/managedBy": "true",
+				},
+			},
+			Data: secretData,
 		}
 
 	case "string":
