@@ -37,10 +37,11 @@ type SecretResource struct {
 	Namespace string `json:"namespace"`
 }
 
-// +kubebuilder:validation:Required
 type SecretGenerator struct {
-	Type   string `json:"type"`
-	Length int    `json:"length"`
+	Type    string `json:"type"`
+	Length  int    `json:"length"`
+	Key     string `json:"key"`
+	HashKey string `json:"hashKey"`
 }
 
 // SecretStatus defines the observed state of Secret
