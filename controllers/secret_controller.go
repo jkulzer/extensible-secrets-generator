@@ -54,17 +54,20 @@ type SecretReconciler struct {
 
 //+kubebuilder:rbac:groups=secrets.esg.jkulzer.dev,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=secrets.esg.jkulzer.dev,resources=secrets/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=secrets.esg.jkulzer.dev,resources=secrets/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-//TODO: user: Modify the Reconcile function to compare the state specified by
+// TODO: user: Modify the Reconcile function to compare the state specified by
 // the Secret object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
+
+// TODO: Delete secret if CRD gets deleted
+// WARNING: IMPORTANT, can't release without it
+
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -73,24 +76,30 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	secret := &secretsv1alpha1.Secret{}
 	err := r.Get(ctx, req.NamespacedName, secret)
+
 	if err != nil {
-		logger.Error(err, "Failed to fetch CRDs")
+		if errors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			logger.Info("Secret not found. Ignoring since object must be deleted")
+			willBeDeletedSecret := r.secretSelection(secret, ctx)
+			r.Delete(ctx, willBeDeletedSecret)
+			return ctrl.Result{}, nil
+		}
 	}
 
-	logger.Info("Secret will have name " + secret.Spec.Secret.Name + " and namespace " + secret.Spec.Secret.Namespace + " and type " + secret.Spec.Generator.Type + " with length " + fmt.Sprintf("%v", secret.Spec.Generator.Length))
-
-	found := &corev1.Secret{}
-	err = r.Get(ctx, types.NamespacedName{Name: secret.Spec.Secret.Name, Namespace: secret.Spec.Secret.Namespace}, found)
+	found := corev1.Secret{}
+	err = r.Get(ctx, types.NamespacedName{Name: secret.Spec.Secret.Name, Namespace: secret.Spec.Secret.Namespace}, &found)
 
 	if err != nil && errors.IsNotFound(err) {
 		// Create a new secret
+		logger.Info("Secret will have name " + secret.Spec.Secret.Name + " and namespace " + secret.Spec.Secret.Namespace + " and type " + secret.Spec.Generator.Type + " with length " + fmt.Sprintf("%v", secret.Spec.Generator.Length))
 		newSecret := r.secretGeneration(secret, ctx)
-		logger.Info("Creating a new Secret" + "Secret Name: " + secret.Spec.Secret.Name + "Secret Namespace: " + secret.Spec.Secret.Namespace)
+
 		err = r.Create(ctx, newSecret)
 		if err != nil {
-			logger.Info("Deleting Secret" + "Secret Name: " + secret.Spec.Secret.Name + "Secret Namespace: " + secret.Spec.Secret.Namespace)
-			err = r.Delete(ctx, newSecret)
-			logger.Error(err, "Failed deleting secret")
+			logger.Info("Failed to create Secret" + "Secret Name: " + secret.Spec.Secret.Name + "Secret Namespace: " + secret.Spec.Secret.Namespace)
 			return ctrl.Result{}, err
 		}
 		// Secret created successfully - return and requeue
@@ -172,7 +181,7 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 		}
 
 	default:
-		logger.Info("No valid generator given")
+		logger.Error(nil, "No valid generator given")
 		return nil
 	}
 
@@ -196,4 +205,22 @@ func randomStringGenerator(length int) []byte {
 	}
 
 	return randomString
+}
+
+func (r *SecretReconciler) secretSelection(secret *secretsv1alpha1.Secret, ctx context.Context) *corev1.Secret {
+	logger := log.FromContext(ctx)
+
+	logger.Info("Deleting Secret with Name " + secret.Spec.Secret.Name + " and Namespace " + secret.Spec.Secret.Namespace)
+
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secret.Spec.Secret.Name,
+			Namespace: secret.Spec.Secret.Namespace,
+			Labels: map[string]string{
+				"esg.jkulzer.dev/managedBy": "true",
+			},
+		},
+	}
+
 }
