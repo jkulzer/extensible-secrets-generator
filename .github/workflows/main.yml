@@ -1,8 +1,8 @@
 name: Build operator container image
-on:
-  push:
-    tags:
-      - "*" # Only runs on pushes with a tag
+on: [push]
+  # push:
+    # tags:
+    #   - "*" # Only runs on pushes with a tag
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,4 +10,4 @@ jobs:
     - uses: xunholy/operator-sdk-action@v1.0.0
       with:
         image: "extensible-secrets-generator"
-        dirPath: "Dockerfile"
+        dirPath: "${{ github.workspace }}./Dockerfile"
