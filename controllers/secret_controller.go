@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time" // Needed for requeue
 
 	"k8s.io/apimachinery/pkg/runtime"
 	// "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
@@ -65,9 +66,6 @@ type SecretReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 
-// TODO: Delete secret if CRD gets deleted
-// WARNING: IMPORTANT, can't release without it
-
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -77,40 +75,28 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	secret := &secretsv1alpha1.Secret{}
 	err := r.Get(ctx, req.NamespacedName, secret)
 
-	if err != nil {
-		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			logger.Info("Secret not found. Ignoring since object must be deleted")
-			willBeDeletedSecret := r.secretSelection(secret, ctx)
-			r.Delete(ctx, willBeDeletedSecret)
-			return ctrl.Result{}, nil
-		}
-	}
-
 	found := corev1.Secret{}
 	err = r.Get(ctx, types.NamespacedName{Name: secret.Spec.Secret.Name, Namespace: secret.Spec.Secret.Namespace}, &found)
 
 	if err != nil && errors.IsNotFound(err) {
-		// Create a new secret
-		logger.Info("Secret will have name " + secret.Spec.Secret.Name + " and namespace " + secret.Spec.Secret.Namespace + " and type " + secret.Spec.Generator.Type + " with length " + fmt.Sprintf("%v", secret.Spec.Generator.Length))
+		// Define a new secret
 		newSecret := r.secretGeneration(secret, ctx)
-
-		err = r.Create(ctx, newSecret)
-		if err != nil {
-			logger.Info("Failed to create Secret" + "Secret Name: " + secret.Spec.Secret.Name + "Secret Namespace: " + secret.Spec.Secret.Namespace)
+		logger.Info("Secret will have name " + secret.Spec.Secret.Name + " and namespace " + secret.Spec.Secret.Namespace + " and type " + secret.Spec.Generator.Type + " with length " + fmt.Sprintf("%v", secret.Spec.Generator.Length))
+		logger.Info("Creating Secret" + "Name: " + secret.Spec.Secret.Name + "Namespace: " + secret.Spec.Secret.Namespace)
+		if err = r.Create(ctx, newSecret); err != nil {
+			logger.Error(err, "Failed to create new Secret",
+				"Secret.Name", secret.Spec.Secret.Name, "Secret.Namespace", secret.Spec.Secret.Namespace)
 			return ctrl.Result{}, err
 		}
-		// Secret created successfully - return and requeue
-		return ctrl.Result{Requeue: true}, err
+
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
 
 	} else if err != nil {
 		logger.Error(err, "Failed to get Secrets")
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, err
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 }
 
 func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx context.Context) *corev1.Secret {
@@ -119,6 +105,8 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 	logger.Info("Creating Secret with Name " + secret.Spec.Secret.Name + " and Namespace " + secret.Spec.Secret.Namespace)
 
 	var randomString []byte
+
+	secretData := make(map[string][]byte)
 
 	switch secret.Spec.Generator.Type {
 	case "authelia-hash":
@@ -157,33 +145,26 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 		secretData[secret.Spec.Generator.HashKey] = []byte(hashedString)
 		secretData[secret.Spec.Generator.Key] = randomToBeHashedString
 
-		return &corev1.Secret{
-			TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secret.Spec.Secret.Name,
-				Namespace: secret.Spec.Secret.Namespace,
-				Labels: map[string]string{
-					"esg.jkulzer.dev/managedBy": "true",
-				},
-			},
-			Data: secretData,
-		}
-
 	case "string":
 		randomString = randomStringGenerator(secret.Spec.Generator.Length)
 		secretData := make(map[string][]byte)
 		secretData[secret.Spec.Generator.Key] = randomString
 
-		return &corev1.Secret{
-			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-			ObjectMeta: metav1.ObjectMeta{Name: secret.Spec.Secret.Name, Namespace: secret.Spec.Secret.Namespace},
-			Data:       secretData,
-		}
-
 	default:
 		logger.Error(nil, "No valid generator given")
 		return nil
 	}
+	secretDefinition := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secret.Spec.Secret.Name,
+			Namespace: secret.Spec.Secret.Namespace,
+		},
+		Data: secretData,
+	}
+	ctrl.SetControllerReference(secret, &secretDefinition, r.Scheme)
+
+	return &secretDefinition
 
 }
 
@@ -205,22 +186,4 @@ func randomStringGenerator(length int) []byte {
 	}
 
 	return randomString
-}
-
-func (r *SecretReconciler) secretSelection(secret *secretsv1alpha1.Secret, ctx context.Context) *corev1.Secret {
-	logger := log.FromContext(ctx)
-
-	logger.Info("Deleting Secret with Name " + secret.Spec.Secret.Name + " and Namespace " + secret.Spec.Secret.Namespace)
-
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secret.Spec.Secret.Name,
-			Namespace: secret.Spec.Secret.Namespace,
-			Labels: map[string]string{
-				"esg.jkulzer.dev/managedBy": "true",
-			},
-		},
-	}
-
 }
