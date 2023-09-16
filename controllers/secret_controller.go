@@ -108,9 +108,17 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 
 	secretData := make(map[string][]byte)
 
+	var charset string
+
+	if secret.Spec.Generator.Charset != "" {
+		charset = secret.Spec.Generator.Charset
+	} else {
+		charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	}
+
 	switch secret.Spec.Generator.Type {
 	case "authelia-hash":
-		randomToBeHashedString := randomStringGenerator(secret.Spec.Generator.Length)
+		randomToBeHashedString := randomStringGenerator(secret.Spec.Generator.Length, charset)
 
 		logger.Info("Hashed String is: " + string(randomToBeHashedString))
 
@@ -146,7 +154,7 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 		secretData[secret.Spec.Generator.Key] = randomToBeHashedString
 
 	case "string":
-		randomString = randomStringGenerator(secret.Spec.Generator.Length)
+		randomString = randomStringGenerator(secret.Spec.Generator.Length, charset)
 		secretData := make(map[string][]byte)
 		secretData[secret.Spec.Generator.Key] = randomString
 
@@ -175,8 +183,7 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func randomStringGenerator(length int) []byte {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+func randomStringGenerator(length int, charset string) []byte {
 	charsetLength := big.NewInt(int64(len(charset)))
 
 	randomString := make([]byte, length)
