@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: xunholy/operator-sdk-action@1.0
+    - uses: xunholy/operator-sdk-action@v1.0.0
       with:
         image: "extensible-secrets-generator"
         dirPath: "Dockerfile"
