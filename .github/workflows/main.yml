@@ -1,9 +1,9 @@
 ---
 name: Build operator container image
-on: [push]
-  # push:
-    # tags:
-    #   - "*" # Only runs on pushes with a tag
+on: 
+  push:
+    tags:
+      - "*" # Only runs on pushes with a tag
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -28,6 +28,7 @@ jobs:
       uses: docker/build-push-action@v5.0.0
       with:
         push: true
-        tags: ghcr.io/${{ github.repository_owner }}/extensible-secrets-generator:latest
+        # github.ref_name should set the tag to the pushed tag
+        tags: ghcr.io/${{ github.repository_owner }}/extensible-secrets-generator:{{ github.ref_name }}
 
 # Reference: https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions
