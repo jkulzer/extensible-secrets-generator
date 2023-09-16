@@ -1,0 +1,14 @@
+name: Build operator container image
+on:
+  push:
+    tags:
+      - "*" # Only runs on pushes with a tag
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: xunholy/operator-sdk-action
+      with:
+          image: "example"
+          tag: 1.0
+          dirPath: "/path/to/build/dockerfile"
