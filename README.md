@@ -12,7 +12,7 @@ helm repo add extensible-secrets-generator https://jkulzer.github.io/extensible-
 ```
 2. (Optional) Install with default values
 ```
-helm install extensible-secrets-generator
+helm install extensible-secrets-generator extensible-secrets-generator/extensible-secrets-generator
 ```
 
 ### Development instance
