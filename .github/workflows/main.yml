@@ -2,8 +2,8 @@
 name: Build operator container image
 on: 
   push:
-    tags:
-      - "*" # Only runs on pushes with a tag
+    # tags:
+    #   - "*" # Only runs on pushes with a tag
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -32,3 +32,25 @@ jobs:
         tags: ghcr.io/${{ github.repository_owner }}/extensible-secrets-generator:${{ github.ref_name }}
 
 # Reference: https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions
+  release-helm-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "git@jkulzer.dev"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.5.0
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
