@@ -29,6 +29,53 @@ jobs:
       with:
         push: true
         # github.ref_name should set the tag to the pushed tag
-        tags: ghcr.io/${{ github.repository_owner }}/extensible-secrets-generator:${{ github.ref_name }}
+        tags: ghcr.io/${{ github.repository_owner }}/extensible-secrets-generator:${{ github.ref_name }},ghcr.io/${{ github.repository_owner }}/extensible-secrets-generator:latest
 
 # Reference: https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions
+  release-helm-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "git@jkulzer.dev"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Package and upload Helm chart
+        run: |
+          curl -sSLo cr.tar.gz "https://github.com/helm/chart-releaser/releases/download/v${CR_VERSION}/chart-releaser_${CR_VERSION}_linux_amd64.tar.gz"
+          tar -xzf cr.tar.gz cr
+          rm cr.tar.gz
+          owner=$(cut -d '/' -f 1 <<< "$GITHUB_REPOSITORY")
+          repo=$(cut -d '/' -f 2 <<< "$GITHUB_REPOSITORY")
+          # package chart
+          ./cr package charts/$repo
+          # upload chart to Github Releases
+          ./cr upload \
+              --owner "$owner" \
+              --git-repo "$repo" \
+              --release-name-template "${{ github.ref_name }}"
+          # update index and push to Github Pages
+          git config user.email "git@jkulzer.dev"
+          git config user.name "$owner"
+          ./cr index \
+              --owner "$owner" \
+              --git-repo "$repo" \
+              --release-name-template "${{ github.ref_name }}" \
+              --index-path ./index.yaml \
+              --charts-repo https://$owner.github.io/$repo \
+              --push
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          CR_VERSION: "1.5.0"

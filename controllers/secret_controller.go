@@ -55,6 +55,7 @@ type SecretReconciler struct {
 
 //+kubebuilder:rbac:groups=secrets.esg.jkulzer.dev,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=secrets.esg.jkulzer.dev,resources=secrets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -71,8 +72,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	logger := log.FromContext(ctx)
 
 	logger.Info("Starting reconcile loop")
-
-	secret := &secretsv1alpha1.Secret{}
+secret := &secretsv1alpha1.Secret{}
 	err := r.Get(ctx, req.NamespacedName, secret)
 
 	found := corev1.Secret{}
@@ -99,6 +99,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, err
 }
 
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx context.Context) *corev1.Secret {
 	logger := log.FromContext(ctx)
 
@@ -177,6 +178,7 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 }
 
 // SetupWithManager sets up the controller with the Manager.
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&secretsv1alpha1.Secret{}).
