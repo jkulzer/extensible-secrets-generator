@@ -65,14 +65,14 @@ jobs:
           ./cr upload \
               --owner "$owner" \
               --git-repo "$repo" \
-              --release-name-template "{{ .Version }}"
+              --release-name-template "{{ .github.ref_name }}"
           # update index and push to Github Pages
-          git config user.email "$owner@users.noreply.github.com"
+          git config user.email "git@jkulzer.dev"
           git config user.name "$owner"
           ./cr index \
               --owner "$owner" \
               --git-repo "$repo" \
-              --release-name-template "{{ .Version }}" \
+              --release-name-template "{{ .github.ref_name }}" \
               --index-path ./index.yaml \
               --charts-repo https://$owner.github.io/$repo \
               --push
