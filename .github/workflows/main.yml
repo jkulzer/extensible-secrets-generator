@@ -60,7 +60,7 @@ jobs:
           owner=$(cut -d '/' -f 1 <<< "$GITHUB_REPOSITORY")
           repo=$(cut -d '/' -f 2 <<< "$GITHUB_REPOSITORY")
           # package chart
-          ./cr package deploy/chart/$repo
+          ./cr package charts/$repo
           # upload chart to Github Releases
           ./cr upload \
               --owner "$owner" \
