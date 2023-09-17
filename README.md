@@ -6,10 +6,16 @@ A simple Kubernetes operator to generate secrets with random values
 ## Getting Started
 
 ### Running on the cluster
+1. Add the Helm repo
+```
+helm repo add extensible-secrets-generator https://jkulzer.github.io/extensible-secrets-generator
+```
+2. (Optional) Install with default values
+```
+helm install extensible-secrets-generator
+```
 
-TODO: Container image and Helm Chart doesn't exist yet
-
-#### Development instance
+### Development instance
 
 You can run the operator locally on your machine for development with this command:
 
