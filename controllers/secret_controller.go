@@ -72,7 +72,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	logger := log.FromContext(ctx)
 
 	logger.Info("Starting reconcile loop")
-secret := &secretsv1alpha1.Secret{}
+	secret := &secretsv1alpha1.Secret{}
 	err := r.Get(ctx, req.NamespacedName, secret)
 
 	found := corev1.Secret{}
@@ -145,8 +145,6 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 
 		logger.Info("Key is: " + hashedString)
 
-		secretData := make(map[string][]byte)
-
 		if secret.Spec.Generator.HashKey == "" {
 			secret.Spec.Generator.HashKey = secret.Spec.Generator.Key + "_HASHED" // If the HashKey doesn't get defined, generate a default one
 		}
@@ -156,13 +154,13 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 
 	case "string":
 		randomString = randomStringGenerator(secret.Spec.Generator.Length, charset)
-		secretData := make(map[string][]byte)
 		secretData[secret.Spec.Generator.Key] = randomString
 
 	default:
 		logger.Error(nil, "No valid generator given")
 		return nil
 	}
+
 	secretDefinition := corev1.Secret{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
 		ObjectMeta: metav1.ObjectMeta{
