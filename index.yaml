@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   extensible-secrets-generator:
   - apiVersion: v2
+    appVersion: 0.1.8
+    created: "2023-09-22T08:39:37.364103926Z"
+    description: A Helm chart for Kubernetes
+    digest: 95fe0b9a967fe32c3ed11e401e481e7a0561b9ca115d2f4047963abe306dae08
+    name: extensible-secrets-generator
+    type: application
+    urls:
+    - https://github.com/jkulzer/extensible-secrets-generator/releases/download/0.1.8/extensible-secrets-generator-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v2
     appVersion: 0.1.0
     created: "2023-09-17T10:26:03.917810877Z"
     description: A Helm chart for Kubernetes
@@ -11,4 +21,4 @@ entries:
     urls:
     - https://github.com/jkulzer/extensible-secrets-generator/releases/download/0.1.0/extensible-secrets-generator-0.1.0.tgz
     version: 0.1.0
-generated: "2023-09-17T10:26:03.917816078Z"
+generated: "2023-09-22T08:39:37.364111826Z"
