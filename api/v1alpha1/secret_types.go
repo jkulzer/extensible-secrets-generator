@@ -35,7 +35,7 @@ type SecretSpec struct {
 type SecretResource struct {
 	Name      string            `json:"name"`
 	Namespace string            `json:"namespace"`
-	Labels    map[string]string `json:"labels"`
+	Labels    map[string]string `json:"labels,omitempty"`
 }
 
 // +kubebuilder:validation:Required
