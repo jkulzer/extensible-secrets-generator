@@ -62,7 +62,12 @@ spec:
   secret:
     name: name
     namespace: default
+    labels:
+      label-that-should-be-present-on-the-secret.k8s.io: true
 ```
+
+The `spec.secret.labels` field will get added to the secret that gets generated
+
 #### Generator type
 
 Specifies the kind of secret that should be generated. Currently the two options are

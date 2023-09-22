@@ -166,6 +166,7 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secret.Spec.Secret.Name,
 			Namespace: secret.Spec.Secret.Namespace,
+			Labels:    secret.Spec.Secret.Labels,
 		},
 		Data: secretData,
 	}
