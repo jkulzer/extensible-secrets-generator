@@ -18,8 +18,9 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"time" // Needed for requeue
+
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	// "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
@@ -38,7 +39,7 @@ import (
 
 	// for random secrets generation
 	"crypto/rand"
-	"math/big"
+	"encoding/base64"
 
 	// for hashing
 	"github.com/go-crypt/crypt/algorithm"
@@ -81,7 +82,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new secret
 		newSecret := r.secretGeneration(secret, ctx)
-		logger.Info("Secret will have name " + secret.Spec.Secret.Name + " and namespace " + secret.Spec.Secret.Namespace + " and type " + secret.Spec.Generator.Type + " with length " + fmt.Sprintf("%v", secret.Spec.Generator.Length))
+		logger.Info("Secret will have name " + secret.Spec.Secret.Name + " and namespace " + secret.Spec.Secret.Namespace)
 		logger.Info("Creating Secret" + "Name: " + secret.Spec.Secret.Name + "Namespace: " + secret.Spec.Secret.Namespace)
 		if err = r.Create(ctx, newSecret); err != nil {
 			logger.Error(err, "Failed to create new Secret",
@@ -105,23 +106,70 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 
 	logger.Info("Creating Secret with Name " + secret.Spec.Secret.Name + " and Namespace " + secret.Spec.Secret.Namespace)
 
-	var randomString []byte
-
 	secretData := make(map[string][]byte)
+
+	keys := secret.Spec.Keys
+
+	generators := secret.Spec.Generators
+
+	generatedSecrets := make(map[string]string)
+
+	for _, generator := range generators {
+		secret1, secret2 := generateSecret(generator, ctx)
+		if generator.Type == "authelia-hash" {
+			generatedSecrets[generator.Name+".hashed"] = secret2
+		}
+		generatedSecrets[generator.Name] = secret1
+	}
+
+	for _, key := range keys {
+		for mapKey, generatedSecret := range generatedSecrets {
+			logger.Info(mapKey)
+			var templateString string
+			if key.TemplateString == string(secretData[key.Key]) || string(secretData[key.Key]) == "" {
+				templateString = key.TemplateString
+			} else {
+				templateString = string(secretData[key.Key])
+			}
+			secretData[key.Key] = []byte(strings.ReplaceAll(templateString, "{{ "+mapKey+" }}", generatedSecret))
+		}
+	}
+
+	secretDefinition := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secret.Spec.Secret.Name,
+			Namespace: secret.Spec.Secret.Namespace,
+			Labels:    secret.Spec.Secret.Labels,
+		},
+		Data: secretData,
+	}
+	ctrl.SetControllerReference(secret, &secretDefinition, r.Scheme)
+
+	return &secretDefinition
+
+}
+
+func generateSecret(generator secretsv1alpha1.SecretGenerator, ctx context.Context) (string, string) {
+
+	logger := log.FromContext(ctx)
 
 	var charset string
 
-	if secret.Spec.Generator.Charset != "" {
-		charset = secret.Spec.Generator.Charset
+	if generator.Charset != "" {
+		charset = generator.Charset
 	} else {
 		charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	}
 
-	switch secret.Spec.Generator.Type {
-	case "authelia-hash":
-		randomToBeHashedString := randomStringGenerator(secret.Spec.Generator.Length, charset)
+	secret1 := ""
+	secret2 := ""
 
-		logger.Info("Hashed String is: " + string(randomToBeHashedString))
+	switch generator.Type {
+	case "authelia-hash":
+		logger := log.FromContext(ctx)
+
+		randomToBeHashedString := randomStringGenerator(generator.Length, generator.Charset)
 
 		var (
 			hasher *pbkdf2.Hasher
@@ -141,39 +189,19 @@ func (r *SecretReconciler) secretGeneration(secret *secretsv1alpha1.Secret, ctx 
 			logger.Error(err, "Failed to hash string")
 		}
 
-		hashedString := digest.Encode()
+		secret1 = string(randomToBeHashedString)
 
-		logger.Info("Key is: " + hashedString)
-
-		if secret.Spec.Generator.HashKey == "" {
-			secret.Spec.Generator.HashKey = secret.Spec.Generator.Key + "_HASHED" // If the HashKey doesn't get defined, generate a default one
-		}
-
-		secretData[secret.Spec.Generator.HashKey] = []byte(hashedString)
-		secretData[secret.Spec.Generator.Key] = randomToBeHashedString
+		secret2 = digest.Encode()
 
 	case "string":
-		randomString = randomStringGenerator(secret.Spec.Generator.Length, charset)
-		secretData[secret.Spec.Generator.Key] = randomString
-
+		randomString := randomStringGenerator(generator.Length, charset)
+		secret1 = string(randomString)
 	default:
 		logger.Error(nil, "No valid generator given")
-		return nil
+		return "", ""
 	}
 
-	secretDefinition := corev1.Secret{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secret.Spec.Secret.Name,
-			Namespace: secret.Spec.Secret.Namespace,
-			Labels:    secret.Spec.Secret.Labels,
-		},
-		Data: secretData,
-	}
-	ctrl.SetControllerReference(secret, &secretDefinition, r.Scheme)
-
-	return &secretDefinition
-
+	return secret1, secret2
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -185,13 +213,17 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func randomStringGenerator(length int, charset string) []byte {
-	charsetLength := big.NewInt(int64(len(charset)))
 
-	randomString := make([]byte, length)
-	for i := range randomString {
-		randomIndex, _ := rand.Int(rand.Reader, charsetLength)
-		randomString[i] = charset[randomIndex.Int64()]
-	}
+	randomBytes := make([]byte, length)
 
-	return randomString
+	// Read cryptographically secure random bytes into the slice
+	rand.Read(randomBytes)
+
+	// Encode the random bytes to a base64 string
+	randomString := base64.StdEncoding.EncodeToString(randomBytes)
+
+	// Trim any padding characters and select the desired length
+	randomString = randomString[:length]
+
+	return []byte(randomString)
 }

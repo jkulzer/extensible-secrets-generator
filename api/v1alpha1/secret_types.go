@@ -23,12 +23,15 @@ import (
 // SecretSpec defines the desired state of Secret
 // +kubebuilder:validation:Required
 type SecretSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Secret     SecretResource    `json:"secret"`
+	Keys       []SecretKeysList  `json:"keys"`
+	Generators []SecretGenerator `json:"generators"`
+}
 
-	// Foo is an example field of Secret. Edit secret_types.go to remove/update
-	Secret    SecretResource  `json:"secret"`
-	Generator SecretGenerator `json:"generator"`
+// +kubebuilder:validation:Required
+type SecretKeysList struct {
+	Key            string `json:"key"`
+	TemplateString string `json:"templateString"`
 }
 
 // +kubebuilder:validation:Required
@@ -40,11 +43,11 @@ type SecretResource struct {
 
 // +kubebuilder:validation:Required
 type SecretGenerator struct {
-	Type    string `json:"type"`
-	Length  int    `json:"length"`
-	Key     string `json:"key"`
-	HashKey string `json:"hashKey,omitempty"`
-	Charset string `json:"charset,omitempty"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Length   int    `json:"length"`
+	Charset  string `json:"charset,omitempty"`
+	HashName string `json:"hashName,omitempty"`
 }
 
 // SecretStatus defines the observed state of Secret

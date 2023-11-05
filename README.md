@@ -31,7 +31,7 @@ This creates a secret with the following metadata:
 
 * The name `name`
 * The namespace `default`
-* two keys named `key` and `hashKey`
+* two keys named `KEY` and `HASH_KEY`
 * it generates the keys using the authelia-hash generator
 * the length of the key is 10
 
@@ -46,11 +46,16 @@ spec:
   secret:
     name: name
     namespace: default
-  generator:
-    type: authelia-hash
-    length: 10
-    key: testkey
-    hashKey: hashed
+  keys:
+    - keys:
+        - key: KEY
+          templateString: "{{ TEST }}"
+        - key: HASH_KEY
+          templateString: "{{ TEST.hashed }}"
+  generators:
+     - name: TEST
+       type: authelia-hash
+       length: 10
 ```
 
 ### Possible CRD options
@@ -76,18 +81,20 @@ Specifies the kind of secret that should be generated. Currently the two options
 ```
 ---
 spec:
-  generator:
-    type: string | authelia-hash 
+  generators:
+   - name: ...
+     type: string | authelia-hash 
 ```
 
 ##### String
 ```
 ---
 spec:
-  generator:
-    type: string
-    length: 20
-    charset: abcdefghijklmnopqrstuvwxyz
+  generators:
+   - name: ...
+     type: string
+     length: 20
+     charset: abcdefghijklmnopqrstuvwxyz
 ```
 
 The `length` key specifies how long the randomly generated secret should be
@@ -109,16 +116,15 @@ spec:
   secret:
     name: name
     namespace: default
-  generator:
+  keys:
+  - name: MY_KEY
+    templateString: "{{ TEST }}"
+  - name: MY_HASHED_KEY
+    templateString: "{{ TEST.hashed }}"
+  generators:
+  - name: TEST
     type: authelia-hash
     length: 10
-    key: testkey
-    hashKey: hashed
 ```
 The `length` key specifies how long the randomly generated cleartext secret should be
-
-The `charset` key specifies what characters the string should contain. Defaults to `abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`
-
-the `key` key specifies under which key the random plaintext string should be stored in the Kubernetes secret
-
-the `hashKey` key specifies under which key the hashed version of the random plaintext string should be stored in the Kubernetes secret. If not set, it default to the `key` key + `_HASHED`
+Using `GENERATOR_NAME.hashed` you can access the Authelia-compatible hashed version of the string
