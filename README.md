@@ -47,11 +47,10 @@ spec:
     name: name
     namespace: default
   keys:
-    - keys:
-        - key: KEY
-          templateString: "{{ TEST }}"
-        - key: HASH_KEY
-          templateString: "{{ TEST.hashed }}"
+    - key: KEY
+      templateString: "{{ TEST }}"
+    - key: HASH_KEY
+      templateString: "{{ TEST.hashed }}"
   generators:
      - name: TEST
        type: authelia-hash
